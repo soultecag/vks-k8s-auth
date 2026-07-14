@@ -30,3 +30,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+*kubeconfig.yaml
+examples/k8s-client/go.mod
+examples/k8s-client/go.sum
