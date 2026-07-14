@@ -8,8 +8,8 @@ Export SUPERVISOR_ENDPOINT, VSPHERE_USERNAME and VSPHERE_PASSWORD as env.
 Execute main.go:
 
 ```
-export SUPERVISOR_ENDPOINT=10.24.68.5
-export VSPHERE_USERNAME=admbaumann@soultec.lab
-export VSPHERE_PASSWORD=Ame9YZt8p6WN8tn%EH7c
+export SUPERVISOR_ENDPOINT=https://10.2.2.5
+export VSPHERE_USERNAME=myuser@example.ch
+export VSPHERE_PASSWORD=myPass24
 go run main.go
 ```
