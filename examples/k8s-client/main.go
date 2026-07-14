@@ -3,20 +3,37 @@ package main
 import (
 	"context"
 	"os"
+	"strconv"
 
 	"github.com/soultec/vks-k8s-auth/pkg/client"
 	v1 "k8s.io/api/core/v1"
 )
 
+var (
+	port     int
+	endpoint string
+	username string
+	password string
+)
+
 func init() {
+
 	//Read the VKS API server endpoint, username, and password from environment variables (SUPERVISOR_ENDPOINT, VSPHERE_USERNAME and VSPHERE_PASSWORD )
 
-	endpoint := os.Getenv("SUPERVISOR_ENDPOINT")
-	username := os.Getenv("VSPHERE_USERNAME")
-	password := os.Getenv("VSPHERE_PASSWORD")
+	endpoint = os.Getenv("SUPERVISOR_ENDPOINT")
+	username = os.Getenv("VSPHERE_USERNAME")
+	password = os.Getenv("VSPHERE_PASSWORD")
+	portString := os.Getenv("VSPHERE_PORT")
 
 	if endpoint == "" || username == "" || password == "" {
 		panic("SUPERVISOR_ENDPOINT, VSPHERE_USERNAME and VSPHERE_PASSWORD environment variables must be set")
+	}
+
+	if portString != "" {
+		parsedPort, err := strconv.Atoi(portString)
+		if err == nil {
+			port = parsedPort
+		}
 	}
 
 }
@@ -25,9 +42,10 @@ func main() {
 	// Create a new VksK8sAuthClient with the configuration read from environment variables.
 	cfg := client.VksAuthConfig{
 		TlsInsecureSkipVerify: false, // Set to true for testing purposes. In production, set to false and provide a valid CA certificate.
-		Endpoint:              os.Getenv("SUPERVISOR_ENDPOINT"),
-		Username:              os.Getenv("VSPHERE_USERNAME"),
-		Password:              os.Getenv("VSPHERE_PASSWORD"),
+		Endpoint:              endpoint,
+		Username:              username,
+		Password:              password,
+		Port:                  port, // Use the port read from environment variable or default to 0 if not set.
 	}
 
 	vksClient, err := client.NewVksK8sAuthClient(cfg)

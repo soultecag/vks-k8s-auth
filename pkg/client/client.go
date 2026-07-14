@@ -19,12 +19,10 @@ type VksK8sAuthClient struct {
 type VksAuthConfig struct {
 	// TlsInsecureSkipVerify is a flag to skip TLS verification for the VKS API server.
 	TlsInsecureSkipVerify bool
-	// Endpoint is the URL of the VKS Supervisor API server. E.g. 10.5.24.5
+	// Endpoint is the URL of the VKS Supervisor API server. E.g. https://10.5.24.5
 	Endpoint string
-
 	// Port is the port of the VKS Supervisor API server. If not specified, the default port will be used.
 	Port int
-
 	// Username is the username to use for authentication with the VKS API server.
 	Username string
 	// Password is the password to use for authentication with the VKS API server.
@@ -38,6 +36,7 @@ func NewVksK8sAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 		return nil, fmt.Errorf("get supervisor host: %w", err)
 	}
 	config.Endpoint = host
+
 	client := &VksK8sAuthClient{
 		cfg: config,
 	}
