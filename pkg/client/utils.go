@@ -19,14 +19,14 @@ import (
 
 // buildSupervisorKubeconfig creates a REST config for vSphere Kubernetes authentication
 // This connects to the supervisorCLuster API server using the provided endpoint, bearer token.
-func (c *VksK8sAuthClient) buildSupervisorKubeconfig(tlsConfig rest.TLSClientConfig) (*rest.Config, error) {
+func (c *VksK8sAuthClient) buildSupervisorKubeconfig() (*rest.Config, error) {
 	if c.token == "" {
 		return nil, fmt.Errorf("bearer token is required")
 	}
 	return &rest.Config{
 		Host:            c.cfg.Endpoint,
 		BearerToken:     c.token,
-		TLSClientConfig: tlsConfig,
+		TLSClientConfig: c.tlsConfig,
 	}, nil
 }
 

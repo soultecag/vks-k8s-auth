@@ -66,7 +66,7 @@ func main() {
 		println(ns.Name)
 	}
 
-	config, err := vksClient.GenerateKubeconfig()
+	config, err := vksClient.GenerateKubeconfig("cluster", "context")
 	if err != nil {
 		panic(err)
 	}

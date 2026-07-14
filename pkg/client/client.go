@@ -46,6 +46,23 @@ func NewVksK8sAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 		return nil, err
 	}
 
+	client.tlsConfig, err = client.buildTLSConfig()
+	if err != nil {
+		return nil, fmt.Errorf("build TLS config failed: %w", err)
+	}
+
+	kubeConfig, err := client.buildSupervisorKubeconfig()
+	if err != nil {
+		return nil, fmt.Errorf("create kubeconfig failed: %w", err)
+	}
+
+	kubeClient, err := k8sapiClient.New(kubeConfig, k8sapiClient.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("create kubernetes client failed: %w", err)
+	}
+
+	client.Client = kubeClient
+
 	return client, nil
 }
 
@@ -58,28 +75,12 @@ func (c *VksK8sAuthClient) Login() error {
 	}
 	c.token = token
 
-	c.tlsConfig, err = c.buildTLSConfig()
-	if err != nil {
-		return fmt.Errorf("build TLS config failed: %w", err)
-	}
-
-	kubeConfig, err := c.buildSupervisorKubeconfig(c.tlsConfig)
-	if err != nil {
-		return fmt.Errorf("create kubeconfig failed: %w", err)
-	}
-
-	kubeClient, err := k8sapiClient.New(kubeConfig, k8sapiClient.Options{})
-	if err != nil {
-		return fmt.Errorf("create kubernetes client failed: %w", err)
-	}
-
-	c.Client = kubeClient
 	return nil
 }
 
-func (c *VksK8sAuthClient) GenerateKubeconfig() (kubeConfig string, err error) {
+func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (kubeConfig string, err error) {
 
-	kubeConfig, err = ConvertRESTConfigToKubeconfig("cluster", "user", "context", &rest.Config{
+	kubeConfig, err = ConvertRESTConfigToKubeconfig(clusterName, c.cfg.Username, contextName, &rest.Config{
 		Host:            c.cfg.Endpoint,
 		BearerToken:     c.token,
 		TLSClientConfig: c.tlsConfig,
