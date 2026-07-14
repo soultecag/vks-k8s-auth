@@ -70,3 +70,18 @@ func main() {
 A runnable example is in `examples/k8s-client`.
 
 See `examples/k8s-client/README.md` for steps.
+
+## Acknowledgements
+
+This project is heavily inspired by the excellent work of **William Arroyo (@warroyo)** and his Supervisor login examples:
+
+- https://github.com/warroyo/supervisor-login-examples
+
+The authentication flow and interaction with the vSphere Supervisor API are based on the concepts demonstrated in that project. This library builds upon those ideas by providing a Go package that:
+
+- exposes a reusable API for applications and operators
+- creates a `controller-runtime` Kubernetes client
+- generates kubeconfig files programmatically
+- is intended to be consumed as a Go module
+
+Many thanks to William Arroyo for publishing the original examples and making them available to the community.
