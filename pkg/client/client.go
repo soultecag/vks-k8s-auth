@@ -32,14 +32,12 @@ type VksAuthConfig struct {
 }
 
 func NewVksK8sAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
-
 	// Validate the supervisor endpoint and port and format it correctly
 	host, err := getSupervisorHost(config.Endpoint, config.Port)
 	if err != nil {
 		return nil, fmt.Errorf("get supervisor host: %w", err)
 	}
 	config.Endpoint = host
-
 	client := &VksK8sAuthClient{
 		cfg: config,
 	}
@@ -61,12 +59,12 @@ func (c *VksK8sAuthClient) Login() error {
 	}
 	c.token = token
 
-	tlsConfig, err := c.buildTLSConfig()
+	c.tlsConfig, err = c.buildTLSConfig()
 	if err != nil {
 		return fmt.Errorf("build TLS config failed: %w", err)
 	}
 
-	kubeConfig, err := c.buildSupervisorKubeconfig(tlsConfig)
+	kubeConfig, err := c.buildSupervisorKubeconfig(c.tlsConfig)
 	if err != nil {
 		return fmt.Errorf("create kubeconfig failed: %w", err)
 	}
