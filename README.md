@@ -73,7 +73,7 @@ See `examples/k8s-client/README.md` for steps.
 
 ## Acknowledgements
 
-This project is heavily inspired by the excellent work of **William Arroyo (@warroyo)** and his Supervisor login examples:
+This project is heavily inspired by the excellent work of  **[William Arroyo (@warroyo)](https://github.com/warroyo)** and his Supervisor login examples:
 
 - https://github.com/warroyo/supervisor-login-examples
 
