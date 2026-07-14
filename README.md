@@ -13,7 +13,7 @@ Simple Go client for logging into a vSphere Supervisor and creating a Kubernetes
 
 - Go 1.26+
 - Access to your Supervisor endpoint
-- Valid SSO credentials
+- Valid credentials
 
 ## Install
 
@@ -61,9 +61,9 @@ func main() {
 
 - `Endpoint`: Supervisor URL or host.
 - `Port`: optional port override.
-- `Username`: SSO username.
-- `Password`: SSO password.
-- `TlsInsecureSkipVerify`: disable TLS verification for test environments.
+- `Username`: username.
+- `Password`: password.
+- `TlsInsecureSkipVerify`: disable TLS
 
 ## Example
 
