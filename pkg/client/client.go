@@ -19,7 +19,7 @@ type VksK8sAuthClient struct {
 	tlsConfig rest.TLSClientConfig
 }
 
-var timeout = 30
+var timeout = 20
 
 type VksAuthConfig struct {
 	// TlsInsecureSkipVerify is a flag to skip TLS verification for the VKS API server.
@@ -32,7 +32,8 @@ type VksAuthConfig struct {
 	Username string
 	// Password is the password to use for authentication with the VKS API server.
 	Password string
-	// Timeout in Seconds is the timeout for the HTTP client when making requests to the VKS API server.
+	// Timeout in Seconds is the timeout for login to the supervisor.
+	// If not specified, the default timeout (20) will be used.
 	Timeout int
 }
 
