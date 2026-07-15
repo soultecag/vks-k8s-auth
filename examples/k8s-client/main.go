@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/soultec/vks-k8s-auth/pkg/client"
+	"github.com/soultecag/vks-k8s-auth/pkg/client"
 	v1 "k8s.io/api/core/v1"
 )
 

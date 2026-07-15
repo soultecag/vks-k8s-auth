@@ -1,8 +1,9 @@
-module github.com/soultec/vks-k8s-auth
+module github.com/soultecag/vks-k8s-auth
 
 go 1.26.2
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	k8s.io/client-go v0.36.0
 	sigs.k8s.io/controller-runtime v0.24.1
 )
@@ -16,7 +17,6 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

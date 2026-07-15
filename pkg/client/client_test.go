@@ -3,7 +3,7 @@ package client_test
 import (
 	"testing"
 
-	"github.com/soultec/vks-k8s-auth/pkg/client"
+	"github.com/soultecag/vks-k8s-auth/pkg/client"
 )
 
 func TestVksK8sAuthClient_GenerateKubeconfig(t *testing.T) {

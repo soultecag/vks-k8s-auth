@@ -18,7 +18,7 @@ Simple Go client for logging into a vSphere Supervisor and creating a Kubernetes
 ## Install
 
 ```bash
-go get github.com/soultec/vks-k8s-auth
+go get github.com/soultecag/vks-k8s-auth
 ```
 
 ## Quick start
@@ -30,7 +30,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/soultec/vks-k8s-auth/pkg/client"
+	"github.com/soultecag/vks-k8s-auth/pkg/client"
 	corev1 "k8s.io/api/core/v1"
 )
 
