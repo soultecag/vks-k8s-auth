@@ -57,8 +57,13 @@ func (c *VksK8sAuthClient) login() (token, raw string, err error) {
 		InsecureSkipVerify: c.cfg.TlsInsecureSkipVerify,
 	}
 
+	// verify Timeout is set, if not set, use default timeout
+	if c.cfg.Timeout <= 0 {
+		c.cfg.Timeout = timeout
+	}
+
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: time.Duration(c.cfg.Timeout) * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: tlsconfig,
 		},
