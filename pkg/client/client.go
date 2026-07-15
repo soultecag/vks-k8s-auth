@@ -32,6 +32,8 @@ type VksAuthConfig struct {
 	Password string
 }
 
+// NewVksK8sAuthClient creates a new VksK8sAuthClient with the provided configuration.
+// It performs the login to the VKS API server and initializes the Kubernetes client.
 func NewVksK8sAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	// Validate the supervisor endpoint and port and format it correctly
 	host, err := getSupervisorHost(config.Endpoint, config.Port)
