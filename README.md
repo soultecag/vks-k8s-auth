@@ -1,13 +1,14 @@
 # vks-k8s-auth
 
-Simple Go client for logging into a vSphere Supervisor and creating a Kubernetes client or kubeconfig.
+Simple Go client for logging into a vSphere Supervisor and creating a Kubernetes client or kubeconfig, for either the Supervisor cluster itself or one of its Tanzu guest clusters.
 
 ## What this library does
 
 1. Logs in to the Supervisor API using username/password.
 2. Reads TLS information from the API server.
-3. Builds a Kubernetes client (`controller-runtime` client).
+3. Builds a Kubernetes client (`controller-runtime` client) for the Supervisor, or for a Tanzu guest cluster running on it.
 4. Can generate a kubeconfig string from the authenticated session.
+5. Handles JWT token expiration and refresh.
 
 ## Requirements
 
@@ -39,9 +40,11 @@ func main() {
 		Endpoint: "https://10.0.0.10",
 		Username: "administrator@vsphere.local",
 		Password: "your-password",
+		// Set GuestClusterName/GuestClusterNamespace and use NewVksGuestClusterAuthClient
+		// instead to target a Tanzu guest cluster rather than the Supervisor.
 	}
 
-	vksClient, err := client.NewVksK8sAuthClient(cfg)
+	vksClient, err := client.NewVksSupervisorAuthClient(cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -55,21 +58,23 @@ func main() {
 }
 ```
 
-## Configuration
+## Configuration & methods
 
-`VksAuthConfig` fields:
+`VksAuthConfig` fields: `Endpoint` (Supervisor URL/host), `Port` (optional override), `Username`, `Password`, `TlsInsecureSkipVerify`, `Timeout` (login timeout in seconds, defaults to 20), and `GuestClusterName`/`GuestClusterNamespace` (required for `NewVksGuestClusterAuthClient`).
 
-- `Endpoint`: Supervisor URL or host.
-- `Port`: optional port override.
-- `Username`: username.
-- `Password`: password.
-- `TlsInsecureSkipVerify`: disable TLS
+Client methods:
 
-## Example
+- `NewVksSupervisorAuthClient(cfg)` / `NewVksGuestClusterAuthClient(cfg)`: authenticate and return a client scoped to the Supervisor or a Tanzu guest cluster.
+- `GenerateKubeconfig(clusterName, contextName)`: generates a kubeconfig string for the authenticated session.
+- `GetToken()`, `TokenValid()`, `TokenExpiry()`, `RefreshToken()`: inspect or refresh the JWT token.
+- `GetGuestClusterEndpoint(ctx, clusterName, namespace)`: resolves a guest cluster's control-plane endpoint from the Supervisor.
 
-A runnable example is in `examples/k8s-client`.
+## Examples
 
-See `examples/k8s-client/README.md` for steps.
+Runnable examples are provided in:
+
+- `examples/k8s-client` — authenticate against the Supervisor cluster. See [examples/k8s-client/README.md](examples/k8s-client/README.md).
+- `examples/k8s-guest-cluster-client` — authenticate against a Tanzu guest cluster.
 
 ## Acknowledgements
 
