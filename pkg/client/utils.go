@@ -23,9 +23,9 @@ type SupervisorLoginResponse struct {
 	GuestClusterCA     string `json:"guest_cluster_ca"`
 }
 
-// buildSupervisorKubeconfig creates a REST config for vSphere Kubernetes authentication
+// buildVksKubeconfig creates a REST config for vSphere Kubernetes authentication
 // This connects to the supervisorCLuster API server using the provided endpoint, bearer token.
-func (c *VksK8sAuthClient) buildSupervisorKubeconfig() (*rest.Config, error) {
+func (c *VksK8sAuthClient) buildVksKubeconfig() (*rest.Config, error) {
 	if c.token == "" {
 		return nil, fmt.Errorf("bearer token is required")
 	}

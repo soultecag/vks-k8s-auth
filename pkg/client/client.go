@@ -72,7 +72,7 @@ func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error)
 		return nil, fmt.Errorf("build TLS config failed: %w", err)
 	}
 
-	kubeConfig, err := client.buildSupervisorKubeconfig()
+	kubeConfig, err := client.buildVksKubeconfig()
 	if err != nil {
 		return nil, fmt.Errorf("create kubeconfig failed: %w", err)
 	}
