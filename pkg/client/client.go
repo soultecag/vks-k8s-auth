@@ -1,11 +1,14 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	k8sapiClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -24,9 +27,9 @@ var timeout = 20
 type VksAuthConfig struct {
 	// TlsInsecureSkipVerify is a flag to skip TLS verification for the VKS API server.
 	TlsInsecureSkipVerify bool
-	// Endpoint is the URL of the VKS Supervisor API server. E.g. https://10.5.24.5
+	// Endpoint is the URL of the VKS API server. E.g. https://10.5.24.5
 	Endpoint string
-	// Port is the port of the VKS Supervisor API server. If not specified, the default port will be used.
+	// Port is the port of the VKS API server. If not specified, the default port will be used.
 	Port int
 	// Username is the username to use for authentication with the VKS API server.
 	Username string
@@ -35,11 +38,16 @@ type VksAuthConfig struct {
 	// Timeout in Seconds is the timeout for login to the supervisor.
 	// If not specified, the default timeout (20) will be used.
 	Timeout int
+
+	// GuestClusterName is the name of the guest cluster for which to generate a kube client.
+	GuestClusterName string
+	// GuestClusterNamespace is the namespace of the guest cluster for which to generate a kube client.
+	GuestClusterNamespace string
 }
 
-// NewVksK8sAuthClient creates a new VksK8sAuthClient with the provided configuration.
+// NewVksSupervisorAuthClient creates a new VksK8sAuthClient with the provided configuration.
 // It performs the login to the VKS API server and initializes the Kubernetes client.
-func NewVksK8sAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
+func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	// Validate the supervisor endpoint and port and format it correctly
 	host, err := getSupervisorHost(config.Endpoint, config.Port)
 	if err != nil {
@@ -52,8 +60,11 @@ func NewVksK8sAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	}
 
 	// Perform login to get the token and initialize the Kubernetes client.
-	if _, err := client.Login(); err != nil {
+	if _, lr, err := client.Login(); err != nil {
 		return nil, err
+	} else if lr.GuestClusterServer != "" && lr.GuestClusterCA != "" {
+		client.cfg.Endpoint = "https://" + lr.GuestClusterServer + ":6443"
+		client.tlsConfig.CAData = []byte(lr.GuestClusterCA)
 	}
 
 	client.tlsConfig, err = client.buildTLSConfig()
@@ -65,7 +76,6 @@ func NewVksK8sAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create kubeconfig failed: %w", err)
 	}
-
 	kubeClient, err := k8sapiClient.New(kubeConfig, k8sapiClient.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("create kubernetes client failed: %w", err)
@@ -76,17 +86,74 @@ func NewVksK8sAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	return client, nil
 }
 
-// Login performs the login to the VKS API server and stores the token in the VksK8sAuthClient struct.
-// It returns the token and any error encountered during the login process.
-func (c *VksK8sAuthClient) Login() (token string, err error) {
-	// Calls the login method to get the token and store it in c.token.
-	token, raw, err := c.login()
+// NewVksGuestClusterAuthClient creates a Kubernetes client using stored vSphere credentials for guest cluster
+func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
+
+	// Validate the GuestClusterName is provided
+	if config.GuestClusterName == "" {
+		return nil, errors.New("guest cluster name is required")
+	}
+	vksAuthClient, err := NewVksSupervisorAuthClient(config)
 	if err != nil {
-		return "", fmt.Errorf("login failed: %w, response: %s", err, raw)
+		return nil, fmt.Errorf("failed to create vSphere authenticated client: %w", err)
+	}
+
+	guestClusterClient, err := k8sapiClient.New(&rest.Config{
+		Host:            vksAuthClient.cfg.Endpoint,
+		BearerToken:     vksAuthClient.token,
+		TLSClientConfig: vksAuthClient.tlsConfig,
+	}, k8sapiClient.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("create kubernetes client failed: %w", err)
+	}
+
+	vksAuthClient.Client = guestClusterClient
+	return vksAuthClient, nil
+}
+
+// GetToken returns the JWT token stored in the VksK8sAuthClient struct.
+func (c *VksK8sAuthClient) GetToken() string {
+	return c.token
+}
+
+// GetGuestClusterEndpoint queries the Supervisor to find the API server IP for a guest cluster.
+func (c *VksK8sAuthClient) GetGuestClusterEndpoint(ctx context.Context, clusterName, namespace string) (string, error) {
+	// The Cluster resource in the Supervisor contains the controlPlaneEndpoint.
+	gvr := schema.GroupVersionResource{
+		Group:    "cluster.x-k8s.io",
+		Version:  "v1beta1",
+		Resource: "clusters",
+	}
+
+	// Use the Supervisor client (c.Client) to fetch the cluster object.
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(gvr.GroupVersion().WithKind("Cluster"))
+
+	err := c.Get(ctx, k8sapiClient.ObjectKey{Namespace: namespace, Name: clusterName}, u)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch cluster resource: %w", err)
+	}
+
+	// Extract spec.controlPlaneEndpoint.host
+	host, found, err := unstructured.NestedString(u.Object, "spec", "controlPlaneEndpoint", "host")
+	if err != nil || !found {
+		return "", fmt.Errorf("could not find controlPlaneEndpoint in cluster resource")
+	}
+
+	return fmt.Sprintf("https://%s", host), nil
+}
+
+// Login performs the login to the VKS API server and stores the token in the VksK8sAuthClient struct.
+// It returns the token, the loginResponse and any error encountered during the login process.
+func (c *VksK8sAuthClient) Login() (token string, lr SupervisorLoginResponse, err error) {
+	// Calls the login method to get the token and store it in c.token.
+	token, lr, err = c.login()
+	if err != nil {
+		return "", lr, fmt.Errorf("login failed: %w, response: %s", err, lr)
 	}
 	c.token = token
 
-	return c.token, nil
+	return c.token, lr, nil
 }
 
 // GenerateKubeconfig generates a kubeconfig string for the authenticated user to access the Kubernetes API server.
@@ -112,7 +179,7 @@ func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (
 
 func (c *VksK8sAuthClient) RefreshToken() (string, error) {
 	// Perform login to refresh the token.
-	token, err := c.Login()
+	token, _, err := c.Login()
 	if err != nil {
 		return "", fmt.Errorf("refresh token failed: %w", err)
 	}

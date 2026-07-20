@@ -17,6 +17,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+type SupervisorLoginResponse struct {
+	SessionID          string `json:"session_id"`
+	GuestClusterServer string `json:"guest_cluster_server"`
+	GuestClusterCA     string `json:"guest_cluster_ca"`
+}
+
 // buildSupervisorKubeconfig creates a REST config for vSphere Kubernetes authentication
 // This connects to the supervisorCLuster API server using the provided endpoint, bearer token.
 func (c *VksK8sAuthClient) buildSupervisorKubeconfig() (*rest.Config, error) {
@@ -49,7 +55,7 @@ func getSupervisorHost(supervisorEndpoint string, port int) (string, error) {
 }
 
 // login POSTs to /wcp/login with Basic auth and returns the session token.
-func (c *VksK8sAuthClient) login() (token, raw string, err error) {
+func (c *VksK8sAuthClient) login() (token string, lr SupervisorLoginResponse, err error) {
 
 	url := fmt.Sprintf("%s/wcp/login", c.cfg.Endpoint)
 
@@ -69,38 +75,43 @@ func (c *VksK8sAuthClient) login() (token, raw string, err error) {
 		},
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader("{}"))
+	// set Body for Login Call
+	requestBody := "{}"
+	if c.cfg.GuestClusterName != "" {
+		requestBody = fmt.Sprintf("{\"guest_cluster_name\":\"%s\",\"guest_cluster_namespace\":\"%s\"}", c.cfg.GuestClusterName, c.cfg.GuestClusterNamespace)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(requestBody))
 	if err != nil {
-		return "", "", err
+		return "", SupervisorLoginResponse{}, err
 	}
 	req.SetBasicAuth(c.cfg.Username, c.cfg.Password)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
 
 	resp, err := client.Do(req)
+
 	if err != nil {
-		return "", "", err
+		return "", SupervisorLoginResponse{}, err
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	raw = string(body)
 
 	if resp.StatusCode != http.StatusOK {
-		return "", raw, fmt.Errorf("unexpected status %s", resp.Status)
+		return "", SupervisorLoginResponse{}, fmt.Errorf("unexpected status %s", resp.Status)
 	}
 
-	var lr struct {
-		SessionID string `json:"session_id"`
-	}
+	lr = SupervisorLoginResponse{}
 	if err := json.Unmarshal(body, &lr); err != nil {
-		return "", raw, fmt.Errorf("decode response: %w", err)
+		return "", lr, fmt.Errorf("decode response: %w", err)
 	}
 	if lr.SessionID == "" {
-		return "", raw, fmt.Errorf("no session_id in response")
+		return "", lr, fmt.Errorf("no session_id in response")
 	}
-	return lr.SessionID, raw, nil
+	return lr.SessionID, lr, nil
 }
+
+// buildTLSConfig builds the TLS configuration for the Kubernetes client based on the VKS API server's CA certificate.
 func (c *VksK8sAuthClient) buildTLSConfig() (rest.TLSClientConfig, error) {
 
 	if !c.cfg.TlsInsecureSkipVerify {

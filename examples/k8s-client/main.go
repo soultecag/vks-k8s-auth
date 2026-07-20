@@ -48,7 +48,7 @@ func main() {
 		Port:                  port, // Use the port read from environment variable or default to 0 if not set.
 	}
 
-	vksClient, err := client.NewVksK8sAuthClient(cfg)
+	vksClient, err := client.NewVksSupervisorAuthClient(cfg)
 	if err != nil {
 		panic(err)
 	}
