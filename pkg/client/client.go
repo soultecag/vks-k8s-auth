@@ -1,14 +1,11 @@
 package client
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	k8sapiClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -114,33 +111,6 @@ func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, erro
 // GetToken returns the JWT token stored in the VksK8sAuthClient struct.
 func (c *VksK8sAuthClient) GetToken() string {
 	return c.token
-}
-
-// GetGuestClusterEndpoint queries the Supervisor to find the API server IP for a guest cluster.
-func (c *VksK8sAuthClient) GetGuestClusterEndpoint(ctx context.Context, clusterName, namespace string) (string, error) {
-	// The Cluster resource in the Supervisor contains the controlPlaneEndpoint.
-	gvr := schema.GroupVersionResource{
-		Group:    "cluster.x-k8s.io",
-		Version:  "v1beta1",
-		Resource: "clusters",
-	}
-
-	// Use the Supervisor client (c.Client) to fetch the cluster object.
-	u := &unstructured.Unstructured{}
-	u.SetGroupVersionKind(gvr.GroupVersion().WithKind("Cluster"))
-
-	err := c.Get(ctx, k8sapiClient.ObjectKey{Namespace: namespace, Name: clusterName}, u)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch cluster resource: %w", err)
-	}
-
-	// Extract spec.controlPlaneEndpoint.host
-	host, found, err := unstructured.NestedString(u.Object, "spec", "controlPlaneEndpoint", "host")
-	if err != nil || !found {
-		return "", fmt.Errorf("could not find controlPlaneEndpoint in cluster resource")
-	}
-
-	return fmt.Sprintf("https://%s", host), nil
 }
 
 // Login performs the login to the VKS API server and stores the token in the VksK8sAuthClient struct.
