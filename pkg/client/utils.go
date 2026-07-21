@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -10,7 +11,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -23,15 +23,22 @@ type SupervisorLoginResponse struct {
 	GuestClusterCA     string `json:"guest_cluster_ca"`
 }
 
+type SupervisorLoginRequest struct {
+	GuestClusterName      string `json:"guest_cluster_name,omitempty"`
+	GuestClusterNamespace string `json:"guest_cluster_namespace,omitempty"`
+}
+
 // buildVksKubeconfig creates a REST config for vSphere Kubernetes authentication
 // This connects to the supervisorCLuster API server using the provided endpoint, bearer token.
 func (c *VksK8sAuthClient) buildVksKubeconfig() (*rest.Config, error) {
-	if c.token == "" {
+
+	token := c.GetToken()
+	if token == "" {
 		return nil, fmt.Errorf("bearer token is required")
 	}
 	return &rest.Config{
 		Host:            c.cfg.Endpoint,
-		BearerToken:     c.token,
+		BearerToken:     token,
 		TLSClientConfig: c.tlsConfig,
 	}, nil
 }
@@ -54,41 +61,57 @@ func getSupervisorHost(supervisorEndpoint string, port int) (string, error) {
 	return host, nil
 }
 
+// newHTTPClient builds a new *http.Client from the given config. It is a pure
+// function with no side effects on the receiver, which keeps it trivially
+// testable and safe to call from ensureHTTPClient below.
+func newHTTPClient(cfg VksAuthConfig) *http.Client {
+	timeoutSeconds := cfg.Timeout
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = defaultTimeoutSeconds
+	}
+
+	return &http.Client{
+		Timeout: time.Duration(timeoutSeconds) * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: cfg.TlsInsecureSkipVerify,
+			},
+		},
+	}
+}
+
+// ensureHTTPClient lazily initializes c.httpClient exactly once, even if called
+// concurrently from multiple goroutines, and returns the shared instance.
+func (c *VksK8sAuthClient) ensureHTTPClient() *http.Client {
+	c.clientOnce.Do(func() {
+		c.httpClient = newHTTPClient(c.cfg)
+	})
+	return c.httpClient
+}
+
 // login POSTs to /wcp/login with Basic auth and returns the session token.
 func (c *VksK8sAuthClient) login() (token string, lr SupervisorLoginResponse, err error) {
 
 	url := fmt.Sprintf("%s/wcp/login", c.cfg.Endpoint)
 
-	tlsconfig := &tls.Config{
-		InsecureSkipVerify: c.cfg.TlsInsecureSkipVerify,
+	httpClient := c.ensureHTTPClient()
+
+	requestBody, err := json.Marshal(SupervisorLoginRequest{
+		GuestClusterName:      c.cfg.GuestClusterName,
+		GuestClusterNamespace: c.cfg.GuestClusterNamespace,
+	})
+	if err != nil {
+		return "", SupervisorLoginResponse{}, fmt.Errorf("encode request body: %w", err)
 	}
 
-	// verify Timeout is set, if not set, use default timeout
-	if c.cfg.Timeout <= 0 {
-		c.cfg.Timeout = timeout
-	}
-
-	client := &http.Client{
-		Timeout: time.Duration(c.cfg.Timeout) * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: tlsconfig,
-		},
-	}
-
-	// set Body for Login Call
-	requestBody := "{}"
-	if c.cfg.GuestClusterName != "" {
-		requestBody = fmt.Sprintf("{\"guest_cluster_name\":\"%s\",\"guest_cluster_namespace\":\"%s\"}", c.cfg.GuestClusterName, c.cfg.GuestClusterNamespace)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(requestBody))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(requestBody))
 	if err != nil {
 		return "", SupervisorLoginResponse{}, err
 	}
 	req.SetBasicAuth(c.cfg.Username, c.cfg.Password)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 
 	if err != nil {
 		return "", SupervisorLoginResponse{}, err
@@ -98,7 +121,9 @@ func (c *VksK8sAuthClient) login() (token string, lr SupervisorLoginResponse, er
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return "", SupervisorLoginResponse{}, fmt.Errorf("unexpected status %s", resp.Status)
+		// Credentials are invalid or the request failed for some reason. Return an error with the status code and response body.
+		// Credentials are never in the response body, so it is safe to include it in the error message.
+		return "", SupervisorLoginResponse{}, fmt.Errorf("unexpected status %s: %s", resp.Status, string(body))
 	}
 
 	lr = SupervisorLoginResponse{}
@@ -117,8 +142,7 @@ func (c *VksK8sAuthClient) buildTLSConfig() (rest.TLSClientConfig, error) {
 	if !c.cfg.TlsInsecureSkipVerify {
 		caPEM, err := c.fetchServerCA()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warn: could not capture API server CA (%v); using system trust store\n", err)
-
+			return rest.TLSClientConfig{}, fmt.Errorf("capture API server CA: %w", err)
 		}
 		return rest.TLSClientConfig{
 			CAData: caPEM,

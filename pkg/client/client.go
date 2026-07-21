@@ -3,12 +3,16 @@ package client
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"k8s.io/client-go/rest"
 	k8sapiClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const defaultTimeoutSeconds = 20
 
 type VksK8sAuthClient struct {
 	k8sapiClient.Client
@@ -17,9 +21,13 @@ type VksK8sAuthClient struct {
 	token string
 	// TLSClientConfig is the TLS configuration for the VKS API server.
 	tlsConfig rest.TLSClientConfig
+	// httpClient is the HTTP client used for making requests to the VKS API server.
+	httpClient *http.Client
+	// clientOnce ensures httpClient is lazily initialized exactly once, even under concurrent access.
+	clientOnce sync.Once
+	// tmu is a mutex to protect access to the token.
+	tmu sync.RWMutex
 }
-
-var timeout = 20
 
 type VksAuthConfig struct {
 	// TlsInsecureSkipVerify is a flag to skip TLS verification for the VKS API server.
@@ -64,6 +72,8 @@ func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error)
 		client.tlsConfig.CAData = []byte(lr.GuestClusterCA)
 	}
 
+	// Build the TLS configuration for the Kubernetes client.
+	// Has a Dependency on the login to get the token and CA data.
 	client.tlsConfig, err = client.buildTLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("build TLS config failed: %w", err)
@@ -86,9 +96,9 @@ func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error)
 // NewVksGuestClusterAuthClient creates a Kubernetes client using stored vSphere credentials for guest cluster
 func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 
-	// Validate the GuestClusterName is provided
-	if config.GuestClusterName == "" {
-		return nil, errors.New("guest cluster name is required")
+	// Validate if the GuestClusterName and GuestClusterNamespace are provided
+	if config.GuestClusterName == "" || config.GuestClusterNamespace == "" {
+		return nil, errors.New("guest cluster name and namespace are required")
 	}
 	vksAuthClient, err := NewVksSupervisorAuthClient(config)
 	if err != nil {
@@ -110,7 +120,10 @@ func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, erro
 
 // GetToken returns the JWT token stored in the VksK8sAuthClient struct.
 func (c *VksK8sAuthClient) GetToken() string {
+	c.tmu.RLock()
+	defer c.tmu.RUnlock()
 	return c.token
+
 }
 
 // Login performs the login to the VKS API server and stores the token in the VksK8sAuthClient struct.
@@ -121,6 +134,9 @@ func (c *VksK8sAuthClient) Login() (token string, lr SupervisorLoginResponse, er
 	if err != nil {
 		return "", lr, fmt.Errorf("login failed: %w, response: %s", err, lr)
 	}
+
+	c.tmu.Lock()
+	defer c.tmu.Unlock()
 	c.token = token
 
 	return c.token, lr, nil
@@ -140,7 +156,7 @@ func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (
 	// Generate the kubeconfig using the current configuration and token.
 	kubeConfig, err = ConvertRESTConfigToKubeconfig(clusterName, c.cfg.Username, contextName, &rest.Config{
 		Host:            c.cfg.Endpoint,
-		BearerToken:     c.token,
+		BearerToken:     c.GetToken(),
 		TLSClientConfig: c.tlsConfig,
 	})
 
@@ -162,7 +178,9 @@ func (c *VksK8sAuthClient) RefreshToken() (string, error) {
 // If the token is empty, malformed, or does not contain a valid "exp" claim,
 // the zero value of time.Time is returned.
 func (c *VksK8sAuthClient) TokenExpiry() time.Time {
-	if c.token == "" {
+
+	authToken := c.GetToken()
+	if authToken == "" {
 		return time.Time{}
 	}
 
@@ -170,7 +188,7 @@ func (c *VksK8sAuthClient) TokenExpiry() time.Time {
 	// The client already obtained this token from the Supervisor authentication flow.
 	// We only need to inspect the claims to determine the expiration time.
 	token, _, err := new(jwt.Parser).ParseUnverified(
-		c.token,
+		authToken,
 		jwt.MapClaims{},
 	)
 	if err != nil {
@@ -201,7 +219,9 @@ func (c *VksK8sAuthClient) TokenExpiry() time.Time {
 // A non-nil error means the token could not be parsed or does not contain a valid expiration.
 // (for example: empty token, malformed JWT, or missing expiration claim).
 func (c *VksK8sAuthClient) TokenValid() (bool, error) {
-	if c.token == "" {
+	token := c.GetToken()
+
+	if token == "" {
 		return false, errors.New("token is empty")
 	}
 
