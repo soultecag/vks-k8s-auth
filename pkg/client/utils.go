@@ -83,9 +83,11 @@ func newHTTPClient(cfg VksAuthConfig) *http.Client {
 // ensureHTTPClient lazily initializes c.httpClient exactly once, even if called
 // concurrently from multiple goroutines, and returns the shared instance.
 func (c *VksK8sAuthClient) ensureHTTPClient() *http.Client {
-	c.clientOnce.Do(func() {
+	c.tmu.Lock()
+	defer c.tmu.Unlock()
+	if c.httpClient == nil {
 		c.httpClient = newHTTPClient(c.cfg)
-	})
+	}
 	return c.httpClient
 }
 

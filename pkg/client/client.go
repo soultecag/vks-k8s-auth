@@ -68,8 +68,8 @@ func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error)
 	if _, lr, err := client.Login(); err != nil {
 		return nil, err
 	} else if lr.GuestClusterServer != "" && lr.GuestClusterCA != "" {
+		// we have a guest cluster, so we need to update the endpoint to point to the guest cluster API server
 		client.cfg.Endpoint = "https://" + lr.GuestClusterServer + ":6443"
-		client.tlsConfig.CAData = []byte(lr.GuestClusterCA)
 	}
 
 	// Build the TLS configuration for the Kubernetes client.
@@ -147,8 +147,10 @@ func (c *VksK8sAuthClient) Login() (token string, lr SupervisorLoginResponse, er
 func (c *VksK8sAuthClient) ResetHTTPClient() {
 	c.tmu.Lock()
 	defer c.tmu.Unlock()
-	if t, ok := c.httpClient.Transport.(*http.Transport); ok {
-		t.CloseIdleConnections()
+	if c.httpClient != nil {
+		if t, ok := c.httpClient.Transport.(*http.Transport); ok {
+			t.CloseIdleConnections()
+		}
 	}
 	c.clientOnce = sync.Once{}
 	c.httpClient = nil
