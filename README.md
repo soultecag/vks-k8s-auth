@@ -67,6 +67,7 @@ Client methods:
 - `NewVksSupervisorAuthClient(cfg)` / `NewVksGuestClusterAuthClient(cfg)`: authenticate and return a client scoped to the Supervisor or a Tanzu guest cluster.
 - `GenerateKubeconfig(clusterName, contextName)`: generates a kubeconfig string for the authenticated session.
 - `GetToken()`, `TokenValid()`, `TokenExpiry()`, `RefreshToken()`: inspect or refresh the JWT token.
+- `ResetHTTPClient()`: closes idle connections and discards the cached HTTP client, so the next login call builds a fresh one (e.g. after changing TLS settings or to force a new connection).
 
 ## Examples
 
