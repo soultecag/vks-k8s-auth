@@ -142,6 +142,18 @@ func (c *VksK8sAuthClient) Login() (token string, lr SupervisorLoginResponse, er
 	return c.token, lr, nil
 }
 
+// ResetHTTPClient resets the HTTP client used for making requests to the VKS API server.
+// useful if the TLS configuration or other settings have changed and a new client needs to be created.
+func (c *VksK8sAuthClient) ResetHTTPClient() {
+	c.tmu.Lock()
+	defer c.tmu.Unlock()
+	if t, ok := c.httpClient.Transport.(*http.Transport); ok {
+		t.CloseIdleConnections()
+	}
+	c.clientOnce = sync.Once{}
+	c.httpClient = nil
+}
+
 // GenerateKubeconfig generates a kubeconfig string for the authenticated user to access the Kubernetes API server.
 // It takes the cluster name and context name as parameters and returns the kubeconfig string and any error encountered during the process.
 func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (kubeConfig string, err error) {
