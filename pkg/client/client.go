@@ -53,6 +53,10 @@ type VksAuthConfig struct {
 // NewVksSupervisorAuthClient creates a new VksK8sAuthClient with the provided configuration.
 // It performs the login to the VKS API server and initializes the Kubernetes client.
 func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
+	return newVKSAuthClient(config)
+}
+
+func newVKSAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	// Validate the supervisor endpoint and port and format it correctly
 	host, err := getSupervisorHost(config.Endpoint, config.Port)
 	if err != nil {
@@ -68,8 +72,8 @@ func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error)
 	if _, lr, err := client.Login(); err != nil {
 		return nil, err
 	} else if lr.GuestClusterServer != "" && lr.GuestClusterCA != "" {
-		// we have a guest cluster, so we need to update the endpoint to point to the guest cluster API server
 		client.cfg.Endpoint = "https://" + lr.GuestClusterServer + ":6443"
+		client.tlsConfig.CAData = []byte(lr.GuestClusterCA)
 	}
 
 	// Build the TLS configuration for the Kubernetes client.
@@ -100,7 +104,7 @@ func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, erro
 	if config.GuestClusterName == "" || config.GuestClusterNamespace == "" {
 		return nil, errors.New("guest cluster name and namespace are required")
 	}
-	vksAuthClient, err := NewVksSupervisorAuthClient(config)
+	vksAuthClient, err := newVKSAuthClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vSphere authenticated client: %w", err)
 	}
