@@ -1,4 +1,4 @@
-package client
+package k8s_utils
 
 import (
 	"fmt"

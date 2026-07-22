@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	k8s_utils "github.com/soultecag/vks-k8s-auth/pkg/k8s_utils"
 	"k8s.io/client-go/rest"
 	k8sapiClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -53,6 +54,10 @@ type VksAuthConfig struct {
 // NewVksSupervisorAuthClient creates a new VksK8sAuthClient with the provided configuration.
 // It performs the login to the VKS API server and initializes the Kubernetes client.
 func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
+	return newVKSAuthClient(config)
+}
+
+func newVKSAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	// Validate the supervisor endpoint and port and format it correctly
 	host, err := getSupervisorHost(config.Endpoint, config.Port)
 	if err != nil {
@@ -68,8 +73,8 @@ func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error)
 	if _, lr, err := client.Login(); err != nil {
 		return nil, err
 	} else if lr.GuestClusterServer != "" && lr.GuestClusterCA != "" {
+		// we have a guest cluster, so we need to update the endpoint to point to the guest cluster API server
 		client.cfg.Endpoint = "https://" + lr.GuestClusterServer + ":6443"
-		client.tlsConfig.CAData = []byte(lr.GuestClusterCA)
 	}
 
 	// Build the TLS configuration for the Kubernetes client.
@@ -100,7 +105,7 @@ func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, erro
 	if config.GuestClusterName == "" || config.GuestClusterNamespace == "" {
 		return nil, errors.New("guest cluster name and namespace are required")
 	}
-	vksAuthClient, err := NewVksSupervisorAuthClient(config)
+	vksAuthClient, err := newVKSAuthClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vSphere authenticated client: %w", err)
 	}
@@ -147,11 +152,22 @@ func (c *VksK8sAuthClient) Login() (token string, lr SupervisorLoginResponse, er
 func (c *VksK8sAuthClient) ResetHTTPClient() {
 	c.tmu.Lock()
 	defer c.tmu.Unlock()
-	if t, ok := c.httpClient.Transport.(*http.Transport); ok {
-		t.CloseIdleConnections()
+	if c.httpClient != nil {
+		if t, ok := c.httpClient.Transport.(*http.Transport); ok {
+			t.CloseIdleConnections()
+		}
 	}
 	c.clientOnce = sync.Once{}
 	c.httpClient = nil
+}
+
+// GetRESTConfig returns a Kubernetes REST config that can be used to create a Kubernetes client.
+func (c *VksK8sAuthClient) GetRESTConfig() *rest.Config {
+	return &rest.Config{
+		Host:            c.cfg.Endpoint,
+		BearerToken:     c.GetToken(),
+		TLSClientConfig: c.tlsConfig,
+	}
 }
 
 // GenerateKubeconfig generates a kubeconfig string for the authenticated user to access the Kubernetes API server.
@@ -166,7 +182,7 @@ func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (
 	}
 
 	// Generate the kubeconfig using the current configuration and token.
-	kubeConfig, err = ConvertRESTConfigToKubeconfig(clusterName, c.cfg.Username, contextName, &rest.Config{
+	kubeConfig, err = k8s_utils.ConvertRESTConfigToKubeconfig(clusterName, c.cfg.Username, contextName, &rest.Config{
 		Host:            c.cfg.Endpoint,
 		BearerToken:     c.GetToken(),
 		TLSClientConfig: c.tlsConfig,

@@ -1,6 +1,9 @@
 package client_test
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -185,5 +188,92 @@ func TestNewVksGuestClusterAuthClient(t *testing.T) {
 				t.Errorf("NewVksGuestClusterAuthClient() = nil, want non-nil client")
 			}
 		})
+	}
+}
+
+func TestNewVksSupervisorAuthClient_Success(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != "admin" || pass != "secret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"session_id": "integration-test-token"})
+	}))
+	defer server.Close()
+
+	c, err := client.NewVksSupervisorAuthClient(client.VksAuthConfig{
+		Endpoint: server.URL,
+		Username: "admin",
+		Password: "secret",
+		// The test server uses a self-signed certificate. TlsInsecureSkipVerify
+		// bypasses both the login TLS handshake and the CA-capture handshake,
+		// since neither cert is trusted by the system store in this environment.
+		TlsInsecureSkipVerify: true,
+	})
+	if err != nil {
+		t.Fatalf("NewVksSupervisorAuthClient() failed: %v", err)
+	}
+	if c.GetToken() != "integration-test-token" {
+		t.Errorf("GetToken() = %q, want %q", c.GetToken(), "integration-test-token")
+	}
+}
+
+func TestNewVksSupervisorAuthClient_InvalidCredentials(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	_, err := client.NewVksSupervisorAuthClient(client.VksAuthConfig{
+		Endpoint:              server.URL,
+		Username:              "admin",
+		Password:              "wrong",
+		TlsInsecureSkipVerify: true,
+	})
+	if err == nil {
+		t.Fatal("NewVksSupervisorAuthClient() succeeded unexpectedly")
+	}
+}
+
+func TestVksK8sAuthClient_ResetHTTPClient_NoPanicWhenUninitialized(t *testing.T) {
+	c := &client.VksK8sAuthClient{}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ResetHTTPClient() panicked on a client that never made a request: %v", r)
+		}
+	}()
+
+	c.ResetHTTPClient()
+}
+
+func TestVksK8sAuthClient_ResetHTTPClient_AfterUse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"session_id": "token-abc"})
+	}))
+	defer server.Close()
+
+	c, err := client.NewVksSupervisorAuthClient(client.VksAuthConfig{
+		Endpoint:              server.URL,
+		Username:              "admin",
+		Password:              "secret",
+		TlsInsecureSkipVerify: true,
+	})
+	if err != nil {
+		t.Fatalf("NewVksSupervisorAuthClient() failed: %v", err)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ResetHTTPClient() panicked on an initialized client: %v", r)
+		}
+	}()
+
+	c.ResetHTTPClient()
+
+	// ResetHTTPClient only recycles the transport; it must not clear the token.
+	if c.GetToken() != "token-abc" {
+		t.Errorf("GetToken() after ResetHTTPClient() = %q, want %q", c.GetToken(), "token-abc")
 	}
 }
