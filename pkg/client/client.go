@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	k8s_utils "github.com/soultecag/vks-k8s-auth/pkg/k8s_utils"
 	"k8s.io/client-go/rest"
 	k8sapiClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -160,6 +161,15 @@ func (c *VksK8sAuthClient) ResetHTTPClient() {
 	c.httpClient = nil
 }
 
+// GetRESTConfig returns a Kubernetes REST config that can be used to create a Kubernetes client.
+func (c *VksK8sAuthClient) GetRESTConfig() *rest.Config {
+	return &rest.Config{
+		Host:            c.cfg.Endpoint,
+		BearerToken:     c.GetToken(),
+		TLSClientConfig: c.tlsConfig,
+	}
+}
+
 // GenerateKubeconfig generates a kubeconfig string for the authenticated user to access the Kubernetes API server.
 // It takes the cluster name and context name as parameters and returns the kubeconfig string and any error encountered during the process.
 func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (kubeConfig string, err error) {
@@ -172,7 +182,7 @@ func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (
 	}
 
 	// Generate the kubeconfig using the current configuration and token.
-	kubeConfig, err = ConvertRESTConfigToKubeconfig(clusterName, c.cfg.Username, contextName, &rest.Config{
+	kubeConfig, err = k8s_utils.ConvertRESTConfigToKubeconfig(clusterName, c.cfg.Username, contextName, &rest.Config{
 		Host:            c.cfg.Endpoint,
 		BearerToken:     c.GetToken(),
 		TLSClientConfig: c.tlsConfig,
