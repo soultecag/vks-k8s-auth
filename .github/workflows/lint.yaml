@@ -49,5 +49,5 @@ jobs:
       - name: Test
         run: go test -v -cover ./...
 
-      - name: Build
-        run: go build -v -ldflags "-s -w" -trimpath
+      - name: Build examples
+        run: go build -v -ldflags "-s -w" -trimpath ./examples/...

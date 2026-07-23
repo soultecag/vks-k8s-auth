@@ -7,10 +7,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
+	"strconv"
+
 	vks_client "github.com/soultecag/vks-k8s-auth/pkg/client"
 )
 
 var (
+	port                   int
 	endpoint               string
 	username               string
 	password               string
@@ -25,7 +28,7 @@ func init() {
 	endpoint = os.Getenv("SUPERVISOR_ENDPOINT")
 	username = os.Getenv("VSPHERE_USERNAME")
 	password = os.Getenv("VSPHERE_PASSWORD")
-	// portString := os.Getenv("VSPHERE_PORT")
+	portString := os.Getenv("VSPHERE_PORT")
 	targetCluster = os.Getenv("TARGET_CLUSTER")
 	targetClusterNamespace = os.Getenv("TARGET_CLUSTER_NAMESPACE")
 
@@ -33,12 +36,12 @@ func init() {
 		panic("SUPERVISOR_ENDPOINT, VSPHERE_USERNAME and VSPHERE_PASSWORD environment variables must be set")
 	}
 
-	// if portString != "" {
-	// 	parsedPort, err := strconv.Atoi(portString)
-	// 	if err == nil {
-	// 		port = parsedPort
-	// 	}
-	// }
+	if portString != "" {
+		parsedPort, err := strconv.Atoi(portString)
+		if err == nil {
+			port = parsedPort
+		}
+	}
 
 }
 
@@ -50,6 +53,7 @@ func main() {
 		GuestClusterName:      targetCluster,
 		GuestClusterNamespace: targetClusterNamespace,
 		Endpoint:              endpoint,
+		Port:                  port,
 		Username:              username,
 		Password:              password,
 		TlsInsecureSkipVerify: false,
