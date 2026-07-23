@@ -45,6 +45,14 @@ jobs:
         working-directory: ${{ runner.temp }}
         env:
           CGO_ENABLED: 1
+          # This clone has its own go.mod, which may require a different Go
+          # version than this repo's `go 1.26.2`. GOTOOLCHAIN=auto can end up
+          # compiling this plugin with a different toolchain binary than the
+          # one used for the rest of the job. Isolating GOCACHE here prevents
+          # those two toolchains from writing conflicting cache entries for
+          # shared stdlib packages (e.g. unicode, math/bits), which otherwise
+          # surfaces as "compile: version X does not match go tool version Y".
+          GOCACHE: ${{ runner.temp }}/plugin-gocache
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
