@@ -118,14 +118,21 @@ func (c *VksK8sAuthClient) login() (token string, lr SupervisorLoginResponse, er
 	if err != nil {
 		return "", SupervisorLoginResponse{}, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		// Only surface the close error if the call otherwise succeeded, so it
+		// never overwrites a more meaningful error (e.g. bad status, decode
+		// failure) already assigned to the named return below.
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("close response body: %w", cerr)
+		}
+	}()
 
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		// Credentials are invalid or the request failed for some reason. Return an error with the status code and response body.
 		// Credentials are never in the response body, so it is safe to include it in the error message.
-		return "", SupervisorLoginResponse{}, fmt.Errorf("unexpected status %s: %s", resp.Status, string(body))
+		return "", SupervisorLoginResponse{}, fmt.Errorf("unexpected status %s: %s - url: %s", resp.Status, string(body), url)
 	}
 
 	lr = SupervisorLoginResponse{}
@@ -168,7 +175,15 @@ func (c *VksK8sAuthClient) fetchServerCA() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+
+	defer func() {
+		// Only surface the close error if the call otherwise succeeded, so it
+		// never overwrites a more meaningful error (e.g. bad status, decode
+		// failure) already assigned to the named return below.
+		if cerr := conn.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("close response body: %w", cerr)
+		}
+	}()
 
 	chain := conn.ConnectionState().PeerCertificates
 	if len(chain) == 0 {

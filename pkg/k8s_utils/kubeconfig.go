@@ -17,14 +17,14 @@ func ConvertRESTConfigToKubeconfig(clusterName, userName, contextName string, co
 		Clusters: map[string]*clientcmdapi.Cluster{
 			clusterName: {
 				Server:                   config.Host,
-				CertificateAuthorityData: config.TLSClientConfig.CAData,
-				InsecureSkipTLSVerify:    config.TLSClientConfig.Insecure,
+				CertificateAuthorityData: config.CAData,
+				InsecureSkipTLSVerify:    config.Insecure,
 			},
 		},
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			userName: {
-				ClientCertificateData: config.TLSClientConfig.CertData,
-				ClientKeyData:         config.TLSClientConfig.KeyData,
+				ClientCertificateData: config.CertData,
+				ClientKeyData:         config.KeyData,
 				Token:                 config.BearerToken,
 				TokenFile:             config.BearerTokenFile,
 				Username:              config.Username,

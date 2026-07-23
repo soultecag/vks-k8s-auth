@@ -46,6 +46,7 @@ func init() {
 }
 
 func main() {
+
 	// Example usage of GetK8sClientForGuestCluster
 
 	client, err := vks_client.NewVksGuestClusterAuthClient(vks_client.VksAuthConfig{

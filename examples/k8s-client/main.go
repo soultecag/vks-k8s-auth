@@ -56,7 +56,7 @@ func main() {
 	// Use the vksClient to interact with the Kubernetes API server.
 	list := v1.NamespaceList{}
 
-	err = vksClient.Client.List(context.Background(), &list)
+	err = vksClient.List(context.Background(), &list)
 	if err != nil {
 		panic(err)
 	}
