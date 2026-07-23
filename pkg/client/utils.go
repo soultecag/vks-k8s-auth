@@ -23,6 +23,7 @@ type SupervisorLoginResponse struct {
 	GuestClusterCA     string `json:"guest_cluster_ca"`
 }
 
+// SupervisorLoginRequest is the JSON payload sent to the Supervisor login endpoint.
 type SupervisorLoginRequest struct {
 	GuestClusterName      string `json:"guest_cluster_name,omitempty"`
 	GuestClusterNamespace string `json:"guest_cluster_namespace,omitempty"`

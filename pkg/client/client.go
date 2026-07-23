@@ -15,6 +15,8 @@ import (
 
 const defaultTimeoutSeconds = 20
 
+// VksK8sAuthClient authenticates against a vSphere Supervisor and exposes a
+// Kubernetes client together with session-management helpers.
 type VksK8sAuthClient struct {
 	k8sapiClient.Client
 	cfg VksAuthConfig
@@ -30,6 +32,8 @@ type VksK8sAuthClient struct {
 	tmu sync.RWMutex
 }
 
+// VksAuthConfig configures authentication against a vSphere Supervisor and,
+// optionally, selection of a guest cluster behind that Supervisor.
 type VksAuthConfig struct {
 	// TlsInsecureSkipVerify is a flag to skip TLS verification for the VKS API server.
 	TlsInsecureSkipVerify bool
@@ -51,8 +55,8 @@ type VksAuthConfig struct {
 	GuestClusterNamespace string
 }
 
-// NewVksSupervisorAuthClient creates a new VksK8sAuthClient with the provided configuration.
-// It performs the login to the VKS API server and initializes the Kubernetes client.
+// NewVksSupervisorAuthClient logs in to the Supervisor API and returns an
+// authenticated Kubernetes client for the Supervisor cluster.
 func NewVksSupervisorAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	return newVKSAuthClient(config)
 }
@@ -98,7 +102,8 @@ func newVKSAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	return client, nil
 }
 
-// NewVksGuestClusterAuthClient creates a Kubernetes client using stored vSphere credentials for guest cluster
+// NewVksGuestClusterAuthClient logs in through the Supervisor API and returns
+// an authenticated Kubernetes client for the selected guest cluster.
 func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 
 	// Validate if the GuestClusterName and GuestClusterNamespace are provided
@@ -123,7 +128,7 @@ func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, erro
 	return vksAuthClient, nil
 }
 
-// GetToken returns the JWT token stored in the VksK8sAuthClient struct.
+// GetToken returns the current session JWT token.
 func (c *VksK8sAuthClient) GetToken() string {
 	c.tmu.RLock()
 	defer c.tmu.RUnlock()
@@ -131,8 +136,8 @@ func (c *VksK8sAuthClient) GetToken() string {
 
 }
 
-// Login performs the login to the VKS API server and stores the token in the VksK8sAuthClient struct.
-// It returns the token, the loginResponse and any error encountered during the login process.
+// Login authenticates against the Supervisor API, stores the returned session
+// token on the client, and returns the token together with the raw login response.
 func (c *VksK8sAuthClient) Login() (token string, lr SupervisorLoginResponse, err error) {
 	// Calls the login method to get the token and store it in c.token.
 	token, lr, err = c.login()
@@ -147,8 +152,8 @@ func (c *VksK8sAuthClient) Login() (token string, lr SupervisorLoginResponse, er
 	return c.token, lr, nil
 }
 
-// ResetHTTPClient resets the HTTP client used for making requests to the VKS API server.
-// useful if the TLS configuration or other settings have changed and a new client needs to be created.
+// ResetHTTPClient discards the cached HTTP client and closes any idle
+// connections so the next request is created with fresh transport state.
 func (c *VksK8sAuthClient) ResetHTTPClient() {
 	c.tmu.Lock()
 	defer c.tmu.Unlock()
@@ -161,7 +166,7 @@ func (c *VksK8sAuthClient) ResetHTTPClient() {
 	c.httpClient = nil
 }
 
-// GetRESTConfig returns a Kubernetes REST config that can be used to create a Kubernetes client.
+// GetRESTConfig returns a Kubernetes REST config for the authenticated target cluster.
 func (c *VksK8sAuthClient) GetRESTConfig() *rest.Config {
 	return &rest.Config{
 		Host:            c.cfg.Endpoint,
@@ -170,8 +175,10 @@ func (c *VksK8sAuthClient) GetRESTConfig() *rest.Config {
 	}
 }
 
-// GenerateKubeconfig generates a kubeconfig string for the authenticated user to access the Kubernetes API server.
-// It takes the cluster name and context name as parameters and returns the kubeconfig string and any error encountered during the process.
+// GenerateKubeconfig returns kubeconfig YAML for the authenticated session.
+//
+// The generated config uses the provided cluster and context names and embeds
+// the current bearer token together with the discovered TLS settings.
 func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (kubeConfig string, err error) {
 
 	// Validate the token before generating the kubeconfig.
@@ -191,6 +198,7 @@ func (c *VksK8sAuthClient) GenerateKubeconfig(clusterName, contextName string) (
 	return
 }
 
+// RefreshToken performs a fresh login and returns the updated session token.
 func (c *VksK8sAuthClient) RefreshToken() (string, error) {
 	// Perform login to refresh the token.
 	token, _, err := c.Login()
