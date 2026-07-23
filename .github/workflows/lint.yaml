@@ -14,7 +14,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go-version: [stable, oldstable ]
+        # Pinned to satisfy go.mod's `go 1.26.2` directive exactly (our
+        # dependencies already require >= go1.26.0, so there is no older
+        # "oldstable" toolchain that can build this module without
+        # GOTOOLCHAIN=auto silently downloading/switching to a newer one
+        # mid-job. Mixing an auto-switched toolchain with the base installed
+        # one within the same job caused inconsistent, non-deterministic
+        # "compile: version X does not match go tool version Y" errors across
+        # steps. Pinning removes the toolchain switch entirely.
+        go-version: ["1.26.2"]
         os: [ubuntu-latest, macos-latest] # Go plugins are only supported on linux, freebsd, and darwin.
     env:
       CGO_ENABLED: 0
