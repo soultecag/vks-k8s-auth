@@ -7,13 +7,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	"strconv"
-
 	vks_client "github.com/soultecag/vks-k8s-auth/pkg/client"
 )
 
 var (
-	port                   int
 	endpoint               string
 	username               string
 	password               string
@@ -28,7 +25,7 @@ func init() {
 	endpoint = os.Getenv("SUPERVISOR_ENDPOINT")
 	username = os.Getenv("VSPHERE_USERNAME")
 	password = os.Getenv("VSPHERE_PASSWORD")
-	portString := os.Getenv("VSPHERE_PORT")
+	// portString := os.Getenv("VSPHERE_PORT")
 	targetCluster = os.Getenv("TARGET_CLUSTER")
 	targetClusterNamespace = os.Getenv("TARGET_CLUSTER_NAMESPACE")
 
@@ -36,12 +33,12 @@ func init() {
 		panic("SUPERVISOR_ENDPOINT, VSPHERE_USERNAME and VSPHERE_PASSWORD environment variables must be set")
 	}
 
-	if portString != "" {
-		parsedPort, err := strconv.Atoi(portString)
-		if err == nil {
-			port = parsedPort
-		}
-	}
+	// if portString != "" {
+	// 	parsedPort, err := strconv.Atoi(portString)
+	// 	if err == nil {
+	// 		port = parsedPort
+	// 	}
+	// }
 
 }
 
@@ -66,7 +63,11 @@ func main() {
 	// fmt.Printf("REST Config: Host: %v\n", cfg.Host)
 
 	nsList := v1.NamespaceList{}
-	client.List(context.Background(), &nsList)
+	err = client.List(context.Background(), &nsList)
+	if err != nil {
+		fmt.Printf("Error listing namespaces in guest cluster: %v\n", err)
+		return
+	}
 	fmt.Printf("Namespaces in guest cluster:\n")
 	for _, ns := range nsList.Items {
 		fmt.Printf("- %s\n", ns.Name)

@@ -236,7 +236,7 @@ func (c *VksK8sAuthClient) TokenExpiry() time.Time {
 	}
 
 	// Return the expiration timestamp as a UTC time.Time.
-	return exp.Time.UTC()
+	return exp.UTC()
 }
 
 // TokenValid reports whether the token held by the VksK8sAuthClient is still valid.
