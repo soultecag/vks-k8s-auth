@@ -8,7 +8,10 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-// ConvertRESTConfigToKubeconfig converts a *rest.Config into a valid kubeconfig YAML string
+// ConvertRESTConfigToKubeconfig converts a rest.Config into kubeconfig YAML.
+//
+// The generated kubeconfig embeds TLS material and credentials from config and
+// uses the provided cluster, user, and context names as the visible entries.
 func ConvertRESTConfigToKubeconfig(clusterName, userName, contextName string, config *rest.Config) (string, error) {
 	// Create clientcmdapi.Config object from the rest.Config
 	kubeconfigObj := clientcmdapi.Config{
