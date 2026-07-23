@@ -23,6 +23,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
+          # Disabled: setup-go's build/module cache key isn't scoped to the
+          # resolved Go version, so a cache saved by one toolchain (e.g. after
+          # GOTOOLCHAIN auto-switches to satisfy go.mod's `go 1.26.2`) can be
+          # restored into a job running a different toolchain, corrupting
+          # GOCACHE ("compile: version X does not match go tool version Y").
+          # golangci-lint-action manages its own version-aware cache instead.
+          cache: false
 
       - name: Check and get dependencies
         run: |
