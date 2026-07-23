@@ -46,12 +46,14 @@ func init() {
 }
 
 func main() {
+
 	// Example usage of GetK8sClientForGuestCluster
 
 	client, err := vks_client.NewVksGuestClusterAuthClient(vks_client.VksAuthConfig{
 		GuestClusterName:      targetCluster,
 		GuestClusterNamespace: targetClusterNamespace,
 		Endpoint:              endpoint,
+		Port:                  port,
 		Username:              username,
 		Password:              password,
 		TlsInsecureSkipVerify: false,
@@ -65,7 +67,11 @@ func main() {
 	// fmt.Printf("REST Config: Host: %v\n", cfg.Host)
 
 	nsList := v1.NamespaceList{}
-	client.List(context.Background(), &nsList)
+	err = client.List(context.Background(), &nsList)
+	if err != nil {
+		fmt.Printf("Error listing namespaces in guest cluster: %v\n", err)
+		return
+	}
 	fmt.Printf("Namespaces in guest cluster:\n")
 	for _, ns := range nsList.Items {
 		fmt.Printf("- %s\n", ns.Name)

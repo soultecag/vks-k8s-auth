@@ -1,3 +1,10 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/soultecag/vks-k8s-auth.svg)](https://pkg.go.dev/github.com/soultecag/vks-k8s-auth)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/soultecag/vks-k8s-auth)](https://github.com/soultecag/vks-k8s-auth/blob/main/go.mod)
+[![Lint](https://github.com/soultecag/vks-k8s-auth/actions/workflows/lint.yaml/badge.svg)](https://github.com/soultecag/vks-k8s-auth/actions/workflows/lint.yaml)
+[![Security Scan](https://github.com/soultecag/vks-k8s-auth/actions/workflows/scan.yaml/badge.svg)](https://github.com/soultecag/vks-k8s-auth/actions/workflows/scan.yaml)
+[![License](https://img.shields.io/github/license/soultecag/vks-k8s-auth)](https://github.com/soultecag/vks-k8s-auth/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/soultecag/vks-k8s-auth)](https://github.com/soultecag/vks-k8s-auth/releases)
+
 # vks-k8s-auth
 
 Simple Go client for logging into a vSphere Supervisor and creating a Kubernetes client or kubeconfig, for either the Supervisor cluster itself or one of its Tanzu guest clusters.

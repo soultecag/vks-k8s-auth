@@ -1,0 +1,76 @@
+name: golangci-lint
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linter:
+    name: golangci-lint
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # Pinned to satisfy go.mod's `go 1.26.2` directive exactly (our
+        # dependencies already require >= go1.26.0, so there is no older
+        # "oldstable" toolchain that can build this module without
+        # GOTOOLCHAIN=auto silently downloading/switching to a newer one
+        # mid-job. Mixing an auto-switched toolchain with the base installed
+        # one within the same job caused inconsistent, non-deterministic
+        # "compile: version X does not match go tool version Y" errors across
+        # steps. Pinning removes the toolchain switch entirely.
+        go-version: ["1.26.2"]
+        os: [ubuntu-latest, macos-latest] # Go plugins are only supported on linux, freebsd, and darwin.
+    env:
+      CGO_ENABLED: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          # Disabled: setup-go's build/module cache key isn't scoped to the
+          # resolved Go version, so a cache saved by one toolchain (e.g. after
+          # GOTOOLCHAIN auto-switches to satisfy go.mod's `go 1.26.2`) can be
+          # restored into a job running a different toolchain, corrupting
+          # GOCACHE ("compile: version X does not match go tool version Y").
+          # golangci-lint-action manages its own version-aware cache instead.
+          cache: false
+
+      - name: Check and get dependencies
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod
+          # git diff --exit-code go.sum
+
+      - name: Install plugins
+        run: |
+          git clone https://github.com/golangci/example-plugin-linter.git
+          cd example-plugin-linter
+          go build -o '${{ github.workspace }}/.plugins/example.so' -buildmode=plugin plugin/example.go
+        working-directory: ${{ runner.temp }}
+        env:
+          CGO_ENABLED: 1
+          # This clone has its own go.mod, which may require a different Go
+          # version than this repo's `go 1.26.2`. GOTOOLCHAIN=auto can end up
+          # compiling this plugin with a different toolchain binary than the
+          # one used for the rest of the job. Isolating GOCACHE here prevents
+          # those two toolchains from writing conflicting cache entries for
+          # shared stdlib packages (e.g. unicode, math/bits), which otherwise
+          # surfaces as "compile: version X does not match go tool version Y".
+          GOCACHE: ${{ runner.temp }}/plugin-gocache
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.1.1
+          # The installation mode `goinstall` always uses `CGO_ENABLED=1`.
+          install-mode: goinstall
+
+      - name: Test
+        run: go test -v -cover ./...
+
+      - name: Build examples
+        run: go build -v -ldflags "-s -w" -trimpath ./examples/...
