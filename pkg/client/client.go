@@ -79,6 +79,8 @@ func newVKSAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	} else if lr.GuestClusterServer != "" && lr.GuestClusterCA != "" {
 		// we have a guest cluster, so we need to update the endpoint to point to the guest cluster API server
 		client.cfg.Endpoint = "https://" + lr.GuestClusterServer + ":6443"
+	} else if config.GuestClusterName != "" && config.GuestClusterNamespace != "" {
+		return nil, fmt.Errorf("Guest Cluster Configuration Provided but was not returned by Supervisor API. GuestClusterName: %s, GuestClusterNamespace: %s", config.GuestClusterName, config.GuestClusterNamespace)
 	}
 
 	// Build the TLS configuration for the Kubernetes client.
