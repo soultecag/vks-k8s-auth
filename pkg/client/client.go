@@ -74,18 +74,18 @@ func newVKSAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	}
 
 	// Perform login to get the token and initialize the Kubernetes client.
-	if _, lr, err := client.Login(); err != nil {
+	var lr SupervisorLoginResponse
+	if _, lr, err = client.Login(); err != nil {
 		return nil, err
-	} else if lr.GuestClusterServer != "" && lr.GuestClusterCA != "" {
-		// we have a guest cluster, so we need to update the endpoint to point to the guest cluster API server
+	} else if lr.GuestClusterServer != "" {
 		client.cfg.Endpoint = "https://" + lr.GuestClusterServer + ":6443"
 	} else if config.GuestClusterName != "" && config.GuestClusterNamespace != "" {
-		return nil, fmt.Errorf("guest Cluster Configuration Provided but was not returned by Supervisor API. GuestClusterName: %s, GuestClusterNamespace: %s", config.GuestClusterName, config.GuestClusterNamespace)
+		return nil, fmt.Errorf("guest Cluster Configuration Provided but was not accessible by Client")
 	}
 
 	// Build the TLS configuration for the Kubernetes client.
-	// Has a Dependency on the login to get the token and CA data.
-	client.tlsConfig, err = client.buildTLSConfig()
+	// Has a dependency on the login to get the token and any guest-cluster CA data.
+	client.tlsConfig, err = client.buildTLSConfig(lr.GuestClusterCA)
 	if err != nil {
 		return nil, fmt.Errorf("build TLS config failed: %w", err)
 	}

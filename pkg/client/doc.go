@@ -1,5 +1,5 @@
 // Package client provides authentication helpers for connecting to a vSphere
-// Supervisor or Tanzu guest cluster and constructing Kubernetes clients from
+// Supervisor or VKS guest cluster and constructing Kubernetes clients from
 // the resulting session.
 //
 // The package logs in to the Supervisor API, captures the API server's TLS

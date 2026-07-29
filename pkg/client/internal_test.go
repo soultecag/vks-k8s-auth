@@ -2,9 +2,12 @@ package client
 
 import (
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -192,7 +195,7 @@ func TestEnsureHTTPClient_ConcurrentSingleton(t *testing.T) {
 
 func TestBuildTLSConfig_InsecureSkipVerify(t *testing.T) {
 	c := &VksK8sAuthClient{cfg: VksAuthConfig{TlsInsecureSkipVerify: true}}
-	tlsCfg, err := c.buildTLSConfig()
+	tlsCfg, err := c.buildTLSConfig("")
 	if err != nil {
 		t.Fatalf("buildTLSConfig() failed: %v", err)
 	}
@@ -201,6 +204,36 @@ func TestBuildTLSConfig_InsecureSkipVerify(t *testing.T) {
 	}
 	if len(tlsCfg.CAData) != 0 {
 		t.Error("CAData should be empty when TlsInsecureSkipVerify is true")
+	}
+}
+
+func TestBuildTLSConfig_UsesValidGuestClusterCA(t *testing.T) {
+	cert := &x509.Certificate{Raw: []byte("test-cert-raw")}
+	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+	encodedCA := base64.StdEncoding.EncodeToString(caPEM)
+
+	c := &VksK8sAuthClient{cfg: VksAuthConfig{Endpoint: "://bad-endpoint"}}
+	tlsCfg, err := c.buildTLSConfig(encodedCA)
+	if err != nil {
+		t.Fatalf("buildTLSConfig() failed: %v", err)
+	}
+	if string(tlsCfg.CAData) != string(caPEM) {
+		t.Errorf("CAData = %q, want %q", tlsCfg.CAData, caPEM)
+	}
+}
+
+func TestBuildTLSConfig_FallsBackToServerCaptureWhenGuestClusterCADecodeFails(t *testing.T) {
+	c := &VksK8sAuthClient{cfg: VksAuthConfig{Endpoint: "://bad-endpoint"}}
+
+	_, err := c.buildTLSConfig("%%%")
+	if err == nil {
+		t.Fatal("buildTLSConfig() succeeded unexpectedly")
+	}
+	if got := err.Error(); !strings.Contains(got, "decode guest cluster CA") {
+		t.Fatalf("error = %q, want decode guest cluster CA context", got)
+	}
+	if got := err.Error(); !strings.Contains(got, "capture API server CA") {
+		t.Fatalf("error = %q, want capture API server CA context", got)
 	}
 }
 

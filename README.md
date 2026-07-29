@@ -7,13 +7,13 @@
 
 # vks-k8s-auth
 
-Simple Go client for logging into a vSphere Supervisor and creating a Kubernetes client or kubeconfig, for either the Supervisor cluster itself or one of its Tanzu guest clusters.
+Simple Go client for logging into a vSphere Supervisor and creating a Kubernetes client or kubeconfig, for either the Supervisor cluster itself or one of its VKS guest clusters.
 
 ## What this library does
 
 1. Logs in to the Supervisor API using username/password.
 2. Reads TLS information from the API server.
-3. Builds a Kubernetes client (`controller-runtime` client) for the Supervisor, or for a Tanzu guest cluster running on it.
+3. Builds a Kubernetes client (`controller-runtime` client) for the Supervisor, or for a VKS guest cluster running on it.
 4. Can generate a kubeconfig string from the authenticated session.
 5. Handles JWT token expiration and refresh.
 
@@ -48,7 +48,7 @@ func main() {
 		Username: "administrator@vsphere.local",
 		Password: "your-password",
 		// Set GuestClusterName/GuestClusterNamespace and use NewVksGuestClusterAuthClient
-		// instead to target a Tanzu guest cluster rather than the Supervisor.
+		// instead to target a VKS guest cluster rather than the Supervisor.
 	}
 
 	vksClient, err := client.NewVksSupervisorAuthClient(cfg)
@@ -71,7 +71,7 @@ func main() {
 
 Client methods:
 
-- `NewVksSupervisorAuthClient(cfg)` / `NewVksGuestClusterAuthClient(cfg)`: authenticate and return a client scoped to the Supervisor or a Tanzu guest cluster.
+- `NewVksSupervisorAuthClient(cfg)` / `NewVksGuestClusterAuthClient(cfg)`: authenticate and return a client scoped to the Supervisor or a VKS guest cluster.
 - `GenerateKubeconfig(clusterName, contextName)`: generates a kubeconfig string for the authenticated session.
 - `GetToken()`, `TokenValid()`, `TokenExpiry()`, `RefreshToken()`: inspect or refresh the JWT token.
 - `ResetHTTPClient()`: closes idle connections and discards the cached HTTP client, so the next login call builds a fresh one (e.g. after changing TLS settings or to force a new connection).
@@ -81,7 +81,7 @@ Client methods:
 Runnable examples are provided in:
 
 - `examples/k8s-client` — authenticate against the Supervisor cluster. See [examples/k8s-client/README.md](examples/k8s-client/README.md).
-- `examples/k8s-guest-cluster-client` — authenticate against a Tanzu guest cluster.
+- `examples/k8s-guest-cluster-client` — authenticate against a VKS guest cluster.
 
 ## Acknowledgements
 

@@ -3,7 +3,7 @@
 Minimal example showing how to:
 
 1. authenticate to Supervisor,
-2. build a Kubernetes client for a Tanzu guest cluster,
+2. build a Kubernetes client for a VKS guest cluster,
 3. list Kubernetes namespaces in the guest cluster,
 4. generate a kubeconfig for the guest cluster.
 
