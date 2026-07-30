@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -203,19 +202,6 @@ func TestBuildTLSConfig_InsecureSkipVerify(t *testing.T) {
 	if len(tlsCfg.CAData) != 0 {
 		t.Error("CAData should be empty when TlsInsecureSkipVerify is true")
 	}
-}
-
-func TestBuildTLSConfig_FallsBackToServerCaptureWhenGuestClusterCADecodeFails(t *testing.T) {
-	c := &VksK8sAuthClient{cfg: VksAuthConfig{Endpoint: "://bad-endpoint"}}
-
-	_, err := c.buildTLSConfig()
-	if err == nil {
-		t.Fatal("buildTLSConfig() succeeded unexpectedly")
-	}
-	if got := err.Error(); !strings.Contains(got, "missing protocol scheme") {
-		t.Fatalf("error = %q, missing protocol scheme", got)
-	}
-
 }
 
 func TestBuildVksKubeconfig(t *testing.T) {

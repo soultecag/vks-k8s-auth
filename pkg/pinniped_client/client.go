@@ -1,7 +1,6 @@
 package client
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -78,24 +77,17 @@ func newVKSAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	if _, lr, err := client.Login(); err != nil {
 		return nil, err
 	} else if lr.GuestClusterServer != "" && lr.GuestClusterCA != "" {
-		caPEM, err := base64.StdEncoding.DecodeString(lr.GuestClusterCA)
-		if err != nil {
-			return nil, fmt.Errorf("decode guest cluster CA: %w", err)
-		}
+		// we have a guest cluster, so we need to update the endpoint to point to the guest cluster API server
 		client.cfg.Endpoint = "https://" + lr.GuestClusterServer + ":6443"
-		client.tlsConfig = rest.TLSClientConfig{
-			CAData: caPEM,
-		}
 	} else if config.GuestClusterName != "" && config.GuestClusterNamespace != "" {
-		return nil, fmt.Errorf("guest Cluster Configuration Provided but was not accessible by Client")
-	} else {
-		// Build the TLS configuration for the Kubernetes client.
-		// Has a Dependency on the login to get the token and CA data.
-		client.tlsConfig, err = client.buildTLSConfig()
-		if err != nil {
-			return nil, fmt.Errorf("build TLS config failed: %w", err)
-		}
+		return nil, fmt.Errorf("guest Cluster Configuration Provided but was not returned by Supervisor API. GuestClusterName: %s, GuestClusterNamespace: %s", config.GuestClusterName, config.GuestClusterNamespace)
+	}
 
+	// Build the TLS configuration for the Kubernetes client.
+	// Has a Dependency on the login to get the token and CA data.
+	client.tlsConfig, err = client.buildTLSConfig()
+	if err != nil {
+		return nil, fmt.Errorf("build TLS config failed: %w", err)
 	}
 
 	kubeConfig, err := client.buildVksKubeconfig()
