@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -147,56 +146,22 @@ func (c *VksK8sAuthClient) login() (token string, lr SupervisorLoginResponse, er
 	return lr.SessionID, lr, nil
 }
 
-// buildTLSConfig builds the TLS configuration for the Kubernetes client.
-//
-// If guestClusterCA is provided, it is preferred as the trust bundle for the
-// guest cluster endpoint. If decoding or validation fails, the function falls
-// back to independently capturing the API server's CA from the current endpoint.
-func (c *VksK8sAuthClient) buildTLSConfig(guestClusterCA string) (rest.TLSClientConfig, error) {
-	if c.cfg.TlsInsecureSkipVerify {
+// buildTLSConfig builds the TLS configuration for the Kubernetes client based on the VKS API server's CA certificate.
+func (c *VksK8sAuthClient) buildTLSConfig() (rest.TLSClientConfig, error) {
+
+	if !c.cfg.TlsInsecureSkipVerify {
+		caPEM, err := c.fetchServerCA()
+		if err != nil {
+			return rest.TLSClientConfig{}, fmt.Errorf("capture API server CA: %w", err)
+		}
 		return rest.TLSClientConfig{
-			Insecure: c.cfg.TlsInsecureSkipVerify,
+			CAData: caPEM,
 		}, nil
 	}
 
-	if guestClusterCA != "" {
-		caPEM, err := decodeGuestClusterCA(guestClusterCA)
-		if err == nil {
-			return rest.TLSClientConfig{
-				CAData: caPEM,
-			}, nil
-		}
-
-		fallbackPEM, fetchErr := c.fetchServerCA()
-		if fetchErr != nil {
-			return rest.TLSClientConfig{}, fmt.Errorf("decode guest cluster CA: %v; capture API server CA: %w", err, fetchErr)
-		}
-		return rest.TLSClientConfig{
-			CAData: fallbackPEM,
-		}, nil
-	}
-
-	caPEM, err := c.fetchServerCA()
-	if err != nil {
-		return rest.TLSClientConfig{}, fmt.Errorf("capture API server CA: %w", err)
-	}
 	return rest.TLSClientConfig{
-		CAData: caPEM,
+		Insecure: c.cfg.TlsInsecureSkipVerify,
 	}, nil
-}
-
-func decodeGuestClusterCA(encodedCA string) ([]byte, error) {
-	caPEM, err := base64.StdEncoding.DecodeString(encodedCA)
-	if err != nil {
-		return nil, err
-	}
-
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(caPEM) {
-		return nil, fmt.Errorf("guest cluster CA is not valid PEM certificate data")
-	}
-
-	return caPEM, nil
 }
 
 // fetchServerCA does a TLS handshake against the API server and returns the

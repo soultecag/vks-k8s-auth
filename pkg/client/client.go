@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -74,20 +75,27 @@ func newVKSAuthClient(config VksAuthConfig) (*VksK8sAuthClient, error) {
 	}
 
 	// Perform login to get the token and initialize the Kubernetes client.
-	var lr SupervisorLoginResponse
-	if _, lr, err = client.Login(); err != nil {
+	if _, lr, err := client.Login(); err != nil {
 		return nil, err
-	} else if lr.GuestClusterServer != "" {
+	} else if lr.GuestClusterServer != "" && lr.GuestClusterCA != "" {
+		caPEM, err := base64.StdEncoding.DecodeString(lr.GuestClusterCA)
+		if err != nil {
+			return nil, fmt.Errorf("decode guest cluster CA: %w", err)
+		}
 		client.cfg.Endpoint = "https://" + lr.GuestClusterServer + ":6443"
+		client.tlsConfig = rest.TLSClientConfig{
+			CAData: caPEM,
+		}
 	} else if config.GuestClusterName != "" && config.GuestClusterNamespace != "" {
 		return nil, fmt.Errorf("guest Cluster Configuration Provided but was not accessible by Client")
-	}
+	} else {
+		// Build the TLS configuration for the Kubernetes client.
+		// Has a Dependency on the login to get the token and CA data.
+		client.tlsConfig, err = client.buildTLSConfig()
+		if err != nil {
+			return nil, fmt.Errorf("build TLS config failed: %w", err)
+		}
 
-	// Build the TLS configuration for the Kubernetes client.
-	// Has a dependency on the login to get the token and any guest-cluster CA data.
-	client.tlsConfig, err = client.buildTLSConfig(lr.GuestClusterCA)
-	if err != nil {
-		return nil, fmt.Errorf("build TLS config failed: %w", err)
 	}
 
 	kubeConfig, err := client.buildVksKubeconfig()
