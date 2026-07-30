@@ -19,7 +19,7 @@ type Config struct {
 	// Supervisor Pinniped endpoint.
 	//
 	// Example:
-	// https://10.24.68.5/wcp/pinniped
+	// https://<supervisorIP>/wcp/pinniped
 	PinnipedURL string
 
 	// Guest cluster Kubernetes API endpoint.

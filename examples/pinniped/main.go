@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 
 	"k8s.io/client-go/kubernetes"
 
@@ -21,13 +22,53 @@ type Discovery struct {
 	JWKSURI               string `json:"jwks_uri"`
 }
 
+var (
+	// port         int
+	supervisorIP string
+	// username     string
+	// password     string
+
+	// VKS Guest cluster API endpoint.
+	//
+	// Get it from:
+	//
+	// kubectl get clusters -A
+	//
+	// or from the VKS API endpoint.
+	//
+	guestClusterAPI string
+)
+
+func init() {
+
+	//Read the VKS API server endpoint, username, and password from environment variables (SUPERVISOR_ENDPOINT, VSPHERE_USERNAME and VSPHERE_PASSWORD )
+
+	supervisorIP = os.Getenv("SUPERVISOR_ENDPOINT")
+	guestClusterAPI = os.Getenv("GUEST_CLUSTER_API")
+	// username = os.Getenv("VSPHERE_USERNAME")
+	// password = os.Getenv("VSPHERE_PASSWORD")
+	// portString := os.Getenv("VSPHERE_PORT")
+
+	if supervisorIP == "" || guestClusterAPI == "" {
+		panic("SUPERVISOR_ENDPOINT and GUEST_CLUSTER_API environment variables must be set, e.g. SUPERVISOR_ENDPOINT=10.24.68.5 GUEST_CLUSTER_API=https://1.2.3.4:6443")
+	}
+
+	// if portString != "" {
+	// 	parsedPort, err := strconv.Atoi(portString)
+	// 	if err == nil {
+	// 		port = parsedPort
+	// 	}
+	// }
+
+}
+
 func main() {
 	ctx := context.Background()
 
 	req, _ := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		"https://10.24.68.5/wcp/pinniped/.well-known/openid-configuration",
+		fmt.Sprintf("https://%s/wcp/pinniped/.well-known/openid-configuration", supervisorIP),
 		nil,
 	)
 
@@ -49,18 +90,8 @@ func main() {
 	fmt.Printf("Auth:   %s\n", d.AuthorizationEndpoint)
 	fmt.Printf("Token:  %s\n", d.TokenEndpoint)
 
-	// VKS Guest cluster API endpoint.
-	//
-	// Get it from:
-	//
-	// kubectl get clusters -A
-	//
-	// or from the VKS API endpoint.
-	//
-	guestClusterAPI := "https://10.24.68.21:6443"
-
 	// Supervisor Pinniped endpoint.
-	pinniped := "https://10.24.68.5/wcp/pinniped"
+	pinniped := fmt.Sprintf("https://%s/wcp/pinniped", supervisorIP)
 
 	cfg, err := vksauth.Login(
 		ctx,
