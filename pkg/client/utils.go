@@ -55,6 +55,12 @@ func getSupervisorHost(supervisorEndpoint string, port int) (string, error) {
 	if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
 		host = "https://" + host
 	}
+
+	if strings.Contains(host, ":") {
+		// If the host already contains a port, we should not append another one.
+		return "", fmt.Errorf("supervisor endpoint should not contain a port: %s", host)
+	}
+
 	host = strings.TrimRight(host, "/")
 	if port != 0 {
 		host = fmt.Sprintf("%s:%d", host, port)

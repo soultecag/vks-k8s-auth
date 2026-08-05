@@ -86,7 +86,7 @@ func main() {
 	println(config)
 
 	// write the kubeconfig to a file
-	err = os.WriteFile("kubeconfig.yaml", []byte(config), 0644)
+	err = os.WriteFile("kubeconfig.yaml", []byte(config), 0640)
 	if err != nil {
 		panic(err)
 	}
