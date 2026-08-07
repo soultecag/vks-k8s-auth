@@ -1,14 +1,14 @@
-package k8s_utils_test
+package k8sutils_test
 
 import (
 	"fmt"
 
-	"github.com/soultecag/vks-k8s-auth/pkg/k8s_utils"
+	"github.com/soultecag/vks-k8s-auth/pkg/k8sutils"
 	"k8s.io/client-go/rest"
 )
 
 func ExampleConvertRESTConfigToKubeconfig() {
-	kubeconfig, err := k8s_utils.ConvertRESTConfigToKubeconfig(
+	kubeconfig, err := k8sutils.ConvertRESTConfigToKubeconfig(
 		"example-cluster",
 		"example-user",
 		"example-context",
