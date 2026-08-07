@@ -1,15 +1,15 @@
-package k8s_utils_test
+package k8sutils_test
 
 import (
 	"testing"
 
-	"github.com/soultecag/vks-k8s-auth/pkg/k8s_utils"
+	"github.com/soultecag/vks-k8s-auth/pkg/k8sutils"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 func TestConvertRESTConfigToKubeconfig(t *testing.T) {
-	kubeConfigYAML, err := k8s_utils.ConvertRESTConfigToKubeconfig("test-cluster", "test-user", "test-context", &rest.Config{
+	kubeConfigYAML, err := k8sutils.ConvertRESTConfigToKubeconfig("test-cluster", "test-user", "test-context", &rest.Config{
 		Host:        "https://10.5.24.5:6443",
 		BearerToken: "test-token",
 		TLSClientConfig: rest.TLSClientConfig{
@@ -61,7 +61,7 @@ func TestConvertRESTConfigToKubeconfig_NoCredentialLeakageOnEmptyConfig(t *testi
 	// Guards against accidentally serializing zero-value secrets (e.g. an
 	// empty token/password ending up as a literal empty string is fine, but
 	// this pins the current, safe behavior against regressions).
-	kubeConfigYAML, err := k8s_utils.ConvertRESTConfigToKubeconfig("c", "u", "ctx", &rest.Config{Host: "https://example.com"})
+	kubeConfigYAML, err := k8sutils.ConvertRESTConfigToKubeconfig("c", "u", "ctx", &rest.Config{Host: "https://example.com"})
 	if err != nil {
 		t.Fatalf("ConvertRESTConfigToKubeconfig() failed: %v", err)
 	}

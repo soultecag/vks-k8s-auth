@@ -1,4 +1,4 @@
-package k8s_utils
+package k8sutils
 
 import (
 	"fmt"

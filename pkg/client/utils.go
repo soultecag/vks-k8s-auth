@@ -37,11 +37,16 @@ func (c *VksK8sAuthClient) buildVksKubeconfig() (*rest.Config, error) {
 	if token == "" {
 		return nil, fmt.Errorf("bearer token is required")
 	}
+	return c.restConfig(), nil
+}
+
+// restConfig returns a *rest.Config for the Kubernetes client, using the current endpoint, token, and TLS configuration.
+func (c *VksK8sAuthClient) restConfig() *rest.Config {
 	return &rest.Config{
 		Host:            c.cfg.Endpoint,
-		BearerToken:     token,
+		BearerToken:     c.GetToken(),
 		TLSClientConfig: c.tlsConfig,
-	}, nil
+	}
 }
 
 // getSupervisorHost validates and formats the supervisor endpoint URL (e.g. https://10.5.24.5)
@@ -75,19 +80,23 @@ func getSupervisorHost(supervisorEndpoint string, port int) (string, error) {
 // function with no side effects on the receiver, which keeps it trivially
 // testable and safe to call from ensureHTTPClient below.
 func newHTTPClient(cfg VksAuthConfig) *http.Client {
-	timeoutSeconds := cfg.Timeout
-	if timeoutSeconds <= 0 {
-		timeoutSeconds = defaultTimeoutSeconds
-	}
 
 	return &http.Client{
-		Timeout: time.Duration(timeoutSeconds) * time.Second,
+		Timeout: getTimeout(cfg),
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: cfg.TlsInsecureSkipVerify,
 			},
 		},
 	}
+}
+
+func getTimeout(cfg VksAuthConfig) time.Duration {
+	timeoutSeconds := cfg.Timeout
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = defaultTimeoutSeconds
+	}
+	return time.Duration(timeoutSeconds) * time.Second
 }
 
 // ensureHTTPClient lazily initializes c.httpClient exactly once, even if called
@@ -104,7 +113,7 @@ func (c *VksK8sAuthClient) ensureHTTPClient() *http.Client {
 // login POSTs to /wcp/login with Basic auth and returns the session token.
 func (c *VksK8sAuthClient) login() (token string, lr SupervisorLoginResponse, err error) {
 
-	url := fmt.Sprintf("%s/wcp/login", c.cfg.Endpoint)
+	loginUrl := fmt.Sprintf("%s/wcp/login", c.cfg.Endpoint)
 
 	httpClient := c.ensureHTTPClient()
 
@@ -116,7 +125,7 @@ func (c *VksK8sAuthClient) login() (token string, lr SupervisorLoginResponse, er
 		return "", SupervisorLoginResponse{}, fmt.Errorf("encode request body: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(requestBody))
+	req, err := http.NewRequest(http.MethodPost, loginUrl, bytes.NewReader(requestBody))
 	if err != nil {
 		return "", SupervisorLoginResponse{}, err
 	}
@@ -142,7 +151,7 @@ func (c *VksK8sAuthClient) login() (token string, lr SupervisorLoginResponse, er
 	if resp.StatusCode != http.StatusOK {
 		// Credentials are invalid or the request failed for some reason. Return an error with the status code and response body.
 		// Credentials are never in the response body, so it is safe to include it in the error message.
-		return "", SupervisorLoginResponse{}, fmt.Errorf("unexpected status %s: %s - url: %s", resp.Status, string(body), url)
+		return "", SupervisorLoginResponse{}, fmt.Errorf("unexpected status %s: %s - url: %s", resp.Status, string(body), loginUrl)
 	}
 
 	lr = SupervisorLoginResponse{}
@@ -181,7 +190,7 @@ func (c *VksK8sAuthClient) fetchServerCA() ([]byte, error) {
 		return nil, err
 	}
 
-	conn, err := tls.Dial("tcp", addr, &tls.Config{InsecureSkipVerify: c.cfg.TlsInsecureSkipVerify})
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: getTimeout(c.cfg)}, "tcp", addr, &tls.Config{InsecureSkipVerify: c.cfg.TlsInsecureSkipVerify})
 	if err != nil {
 		return nil, err
 	}
