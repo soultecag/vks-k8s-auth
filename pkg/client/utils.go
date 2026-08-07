@@ -55,14 +55,17 @@ func getSupervisorHost(supervisorEndpoint string, port int) (string, error) {
 	if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
 		host = "https://" + host
 	}
-
-	if strings.Contains(host, ":") {
-		// If the host already contains a port, we should not append another one.
-		return "", fmt.Errorf("supervisor endpoint should not contain a port: %s", host)
-	}
-
 	host = strings.TrimRight(host, "/")
+
 	if port != 0 {
+		parsed, err := url.Parse(host)
+		if err != nil {
+			return "", fmt.Errorf("parse supervisor endpoint: %w", err)
+		}
+		if strings.Contains(parsed.Host, ":") {
+			// The endpoint already specifies a port, so appending Port would produce an ambiguous "host:port1:port2".
+			return "", fmt.Errorf("supervisor endpoint %q already contains a port, cannot also set Port", host)
+		}
 		host = fmt.Sprintf("%s:%d", host, port)
 	}
 	return host, nil
@@ -90,8 +93,8 @@ func newHTTPClient(cfg VksAuthConfig) *http.Client {
 // ensureHTTPClient lazily initializes c.httpClient exactly once, even if called
 // concurrently from multiple goroutines, and returns the shared instance.
 func (c *VksK8sAuthClient) ensureHTTPClient() *http.Client {
-	c.tmu.Lock()
-	defer c.tmu.Unlock()
+	c.hmu.Lock()
+	defer c.hmu.Unlock()
 	if c.httpClient == nil {
 		c.httpClient = newHTTPClient(c.cfg)
 	}

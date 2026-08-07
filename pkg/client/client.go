@@ -27,10 +27,10 @@ type VksK8sAuthClient struct {
 	tlsConfig rest.TLSClientConfig
 	// httpClient is the HTTP client used for making requests to the VKS API server.
 	httpClient *http.Client
-	// clientOnce ensures httpClient is lazily initialized exactly once, even under concurrent access.
-	clientOnce sync.Once
-	// tmu is a mutex to protect access to the token.
+	// tmu is a mutex protecting access to token.
 	tmu sync.RWMutex
+	// hmu is a mutex protecting access to httpClient initialization.
+	hmu sync.Mutex
 }
 
 // VksAuthConfig configures authentication against a vSphere Supervisor and,
@@ -125,16 +125,6 @@ func NewVksGuestClusterAuthClient(config VksAuthConfig) (*VksK8sAuthClient, erro
 		return nil, fmt.Errorf("failed to create vSphere authenticated client: %w", err)
 	}
 
-	guestClusterClient, err := k8sapiClient.New(&rest.Config{
-		Host:            vksAuthClient.cfg.Endpoint,
-		BearerToken:     vksAuthClient.token,
-		TLSClientConfig: vksAuthClient.tlsConfig,
-	}, k8sapiClient.Options{})
-	if err != nil {
-		return nil, fmt.Errorf("create kubernetes client failed: %w", err)
-	}
-
-	vksAuthClient.Client = guestClusterClient
 	return vksAuthClient, nil
 }
 
@@ -165,14 +155,13 @@ func (c *VksK8sAuthClient) Login() (token string, lr SupervisorLoginResponse, er
 // ResetHTTPClient discards the cached HTTP client and closes any idle
 // connections so the next request is created with fresh transport state.
 func (c *VksK8sAuthClient) ResetHTTPClient() {
-	c.tmu.Lock()
-	defer c.tmu.Unlock()
+	c.hmu.Lock()
+	defer c.hmu.Unlock()
 	if c.httpClient != nil {
 		if t, ok := c.httpClient.Transport.(*http.Transport); ok {
 			t.CloseIdleConnections()
 		}
 	}
-	c.clientOnce = sync.Once{}
 	c.httpClient = nil
 }
 
