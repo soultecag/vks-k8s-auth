@@ -2,9 +2,9 @@ name: Security Scan
 
 on:
   push:
-    branches: [main, "feat/sbom"]
+    branches: [main]
   pull_request:
-    branches: [main, "feat/sbom"]
+    branches: [main]
 
 jobs:
   scan:
